@@ -3,14 +3,8 @@ snscrape is a scraper for social networking services (SNS). It scrapes things li
 
 The following services are currently supported:
 
-* Facebook: user profiles, groups, and communities (aka visitor posts)
-* Instagram: user profiles, hashtags, and locations
-* Mastodon: user profiles and toots (single or thread)
-* Reddit: users, subreddits, and searches (via Pushshift)
-* Telegram: channels
 * Twitter: users, user profiles, hashtags, searches (live tweets, top tweets, and users), tweets (single or surrounding thread), list posts, communities, and trends
-* VKontakte: user profiles
-* Weibo (Sina Weibo): user profiles
+
 
 ## Requirements
 snscrape requires Python 3.8 or higher. The Python package dependencies are installed automatically when you install snscrape.
@@ -70,9 +64,7 @@ You should have received a copy of the GNU General Public License along with thi
 
 ## Commands
 ```bash
-snscrape --verbose --jsonl twitter-search "(from:TaylorLorenz) include:nativeretweets since:2023-02-01"
-snscrape --verbose --jsonl twitter-search "(from:alikarimi_ak8) include:nativeretweets since:2023-02-01"
-snscrape --verbose --jsonl twitter-search "(from:cathiedwood) include:nativeretweets since:2023-02-01"
+snscrape -v --jsonl twitter-search "(from:username) include:nativeretweets since:2023-02-01"
 
-snscrape --jsonl twitter-search "(to:TaylorLorenz) since:2023-02-01"
+snscrape --jsonl twitter-search "(to:username) since:2023-02-01"
 ```
