@@ -14,6 +14,7 @@ import requests
 #import snscrape.version
 import sys
 import tempfile
+from pymongo import MongoClient
 
 
 ## Logging
@@ -244,7 +245,6 @@ def parse_args():
 	group = parser.add_mutually_exclusive_group(required = False)
 	group.add_argument('-f', '--format', dest = 'format', type = parse_format, default = None, help = 'Output format')
 	group.add_argument('--jsonl', dest = 'jsonl', action = 'store_true', default = False, help = 'Output JSONL')
-	parser.add_argument('--with-entity', dest = 'withEntity', action = 'store_true', default = False, help = 'Include the entity (e.g. user, channel) as the first output item')
 	parser.add_argument('--since', type = parse_datetime_arg, metavar = 'DATETIME', help = 'Only return results newer than DATETIME')
 	parser.add_argument('--progress', action = 'store_true', default = False, help = 'Report progress on stderr')
 
@@ -261,9 +261,6 @@ def parse_args():
 		subparser.set_defaults(cls = cls)
 
 	args = parser.parse_args()
-
-	if not args.withEntity and args.maxResults == 0:
-		parser.error('--max-results 0 is only valid when used with --with-entity')
 
 	return args
 
@@ -305,15 +302,16 @@ def main():
 	args = parse_args()
 	configure_logging(args.verbosity, args.dumpLocals)
 	scraper = args.cls._cli_from_args(args)
-
 	i = 0
+	client = MongoClient("mongodb://localhost:27017/")
+	db = client["twitter-watch"]
+	tweets = db["tweets"]
+	tweets.create_index([("id", 1)], unique=True)
+	tweets.create_index([("conversationId", 1)], unique=False)
+	users = db["users"]
+	users.create_index([("id", 1)], unique=True)
 	with _dump_locals_on_exception():
 		try:
-			if args.withEntity and (entity := scraper.entity):
-				if args.jsonl:
-					print(entity.json())
-				else:
-					print(entity)
 			if args.maxResults == 0:
 				logger.info('Exiting after 0 results')
 				return
@@ -322,7 +320,12 @@ def main():
 					logger.info(f'Exiting due to reaching older results than {args.since}')
 					break
 				if args.jsonl:
-					print(item.json())
+					# print('**** >>>>>>>>>>>>>>>>>>>>>>')
+					document = item.json()
+					tweets.update_one({"id": document['id']}, {"$set": document}, upsert=True)
+					# print(document['user'])
+					users.update_one({"id": document['user']['id']}, {"$set": document['user']}, upsert=True)
+					# print(json.loads(item.json()))
 				elif args.format is not None:
 					print(args.format.format(item))
 				else:

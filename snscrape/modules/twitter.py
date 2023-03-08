@@ -60,30 +60,13 @@ class Tweet(snscrape.base.Item):
 	quoteCount: int
 	conversationId: int
 	lang: str
-	source: typing.Optional[str] = None
-	sourceUrl: typing.Optional[str] = None
-	sourceLabel: typing.Optional[str] = None
-	links: typing.Optional[typing.List['TextLink']] = None
-	media: typing.Optional[typing.List['Medium']] = None
 	retweetedTweet: typing.Optional['Tweet'] = None
 	quotedTweet: typing.Optional['Tweet'] = None
 	inReplyToTweetId: typing.Optional[int] = None
 	inReplyToUser: typing.Optional['User'] = None
-	mentionedUsers: typing.Optional[typing.List['User']] = None
-	coordinates: typing.Optional['Coordinates'] = None
-	place: typing.Optional['Place'] = None
-	hashtags: typing.Optional[typing.List[str]] = None
-	cashtags: typing.Optional[typing.List[str]] = None
-	card: typing.Optional['Card'] = None
 	viewCount: typing.Optional[int] = None
-	vibe: typing.Optional['Vibe'] = None
 
 	username = snscrape.base._DeprecatedProperty('username', lambda self: self.user.username, 'user.username')
-	outlinks = snscrape.base._DeprecatedProperty('outlinks', lambda self: [x.url for x in self.links] if self.links else [], 'links (url attribute)')
-	outlinksss = snscrape.base._DeprecatedProperty('outlinksss', lambda self: ' '.join(x.url for x in self.links) if self.links else '', 'links (url attribute)')
-	tcooutlinks = snscrape.base._DeprecatedProperty('tcooutlinks', lambda self: [x.tcourl for x in self.links] if self.links else [], 'links (tcourl attribute)')
-	tcooutlinksss = snscrape.base._DeprecatedProperty('tcooutlinksss', lambda self: ' '.join(x.tcourl for x in self.links) if self.links else '', 'links (tcourl attribute)')
-	content = snscrape.base._DeprecatedProperty('content', lambda self: self.rawContent, 'rawContent')
 
 	def __str__(self):
 		return self.url
@@ -464,28 +447,6 @@ class User(snscrape.base.Item):
 	username: str
 	id: int
 	displayname: typing.Optional[str] = None
-	rawDescription: typing.Optional[str] = None # Raw description with the URL(s) intact
-	renderedDescription: typing.Optional[str] = None # Description as it's displayed on the web interface with URLs replaced
-	descriptionLinks: typing.Optional[typing.List[TextLink]] = None
-	verified: typing.Optional[bool] = None
-	created: typing.Optional[datetime.datetime] = None
-	followersCount: typing.Optional[int] = None
-	friendsCount: typing.Optional[int] = None
-	statusesCount: typing.Optional[int] = None
-	favouritesCount: typing.Optional[int] = None
-	listedCount: typing.Optional[int] = None
-	mediaCount: typing.Optional[int] = None
-	location: typing.Optional[str] = None
-	protected: typing.Optional[bool] = None
-	link: typing.Optional[TextLink] = None
-	profileImageUrl: typing.Optional[str] = None
-	profileBannerUrl: typing.Optional[str] = None
-	label: typing.Optional['UserLabel'] = None
-
-	descriptionUrls = snscrape.base._DeprecatedProperty('descriptionUrls', lambda self: self.descriptionLinks, 'descriptionLinks')
-	linkUrl = snscrape.base._DeprecatedProperty('linkUrl', lambda self: self.link.url if self.link else None, 'link.url')
-	linkTcourl = snscrape.base._DeprecatedProperty('linkTcourl', lambda self: self.link.tcourl if self.link else None, 'link.tcourl')
-	description = snscrape.base._DeprecatedProperty('description', lambda self: self.renderedDescription, 'renderedDescription')
 
 	@property
 	def url(self):
@@ -879,13 +840,6 @@ class _TwitterAPIScraper(snscrape.base.Scraper):
 		kwargs['renderedContent'] = self._render_text_with_urls(tweet['full_text'], tweet['entities'].get('urls'))
 		kwargs['user'] = user
 		kwargs['date'] = email.utils.parsedate_to_datetime(tweet['created_at'])
-		if tweet['entities'].get('urls'):
-			kwargs['links'] = [TextLink(
-			                     text = u.get('display_url'),
-			                     url = u['expanded_url'],
-			                     tcourl = u['url'],
-			                     indices = tuple(u['indices']),
-			                   ) for u in tweet['entities']['urls']]
 		kwargs['url'] = f'https://twitter.com/{user.username}/status/{tweetId}'
 		kwargs['replyCount'] = tweet['reply_count']
 		kwargs['retweetCount'] = tweet['retweet_count']
@@ -893,19 +847,6 @@ class _TwitterAPIScraper(snscrape.base.Scraper):
 		kwargs['quoteCount'] = tweet['quote_count']
 		kwargs['conversationId'] = tweet['conversation_id'] if 'conversation_id' in tweet else int(tweet['conversation_id_str'])
 		kwargs['lang'] = tweet['lang']
-		if 'source' in tweet:
-			kwargs['source'] = tweet['source']
-			if (match := re.search(r'href=[\'"]?([^\'" >]+)', tweet['source'])):
-				kwargs['sourceUrl'] = match.group(1)
-			if (match := re.search(r'>([^<]*)<', tweet['source'])):
-				kwargs['sourceLabel'] = match.group(1)
-		if 'extended_entities' in tweet and 'media' in tweet['extended_entities']:
-			media = []
-			for medium in tweet['extended_entities']['media']:
-				if (mediumO := self._make_medium(medium, tweetId)):
-					media.append(mediumO)
-			if media:
-				kwargs['media'] = media
 		if retweetedTweet:
 			kwargs['retweetedTweet'] = retweetedTweet
 		if quotedTweet:
@@ -921,43 +862,6 @@ class _TwitterAPIScraper(snscrape.base.Scraper):
 						kwargs['inReplyToUser'] = User(username = u['screen_name'], id = u['id'] if 'id' in u else int(u['id_str']), displayname = u['name'])
 			if 'inReplyToUser' not in kwargs:
 				kwargs['inReplyToUser'] = User(username = tweet['in_reply_to_screen_name'], id = inReplyToUserId)
-		if tweet['entities'].get('user_mentions'):
-			kwargs['mentionedUsers'] = [User(username = u['screen_name'], id = u['id'] if 'id' in u else int(u['id_str']), displayname = u['name']) for u in tweet['entities']['user_mentions']]
-
-		# https://developer.twitter.com/en/docs/tutorials/filtering-tweets-by-location
-		if tweet.get('coordinates'):
-			# coordinates root key (if present) presents coordinates in the form [LONGITUDE, LATITUDE]
-			if (coords := tweet['coordinates']['coordinates']) and len(coords) == 2:
-				kwargs['coordinates'] = Coordinates(coords[0], coords[1])
-		elif tweet.get('geo'):
-			# coordinates root key (if present) presents coordinates in the form [LATITUDE, LONGITUDE]
-			if (coords := tweet['geo']['coordinates']) and len(coords) == 2:
-				kwargs['coordinates'] = Coordinates(coords[1], coords[0])
-		if tweet.get('place'):
-			kwargs['place'] = Place(tweet['place']['id'], tweet['place']['full_name'], tweet['place']['name'], tweet['place']['place_type'], tweet['place']['country'], tweet['place']['country_code'])
-			if 'coordinates' not in kwargs and tweet['place'].get('bounding_box') and (coords := tweet['place']['bounding_box']['coordinates']) and coords[0] and len(coords[0][0]) == 2:
-				# Take the first (longitude, latitude) couple of the "place square"
-				kwargs['coordinates'] = Coordinates(coords[0][0][0], coords[0][0][1])
-		if tweet['entities'].get('hashtags'):
-			kwargs['hashtags'] = [o['text'] for o in tweet['entities']['hashtags']]
-		if tweet['entities'].get('symbols'):
-			kwargs['cashtags'] = [o['text'] for o in tweet['entities']['symbols']]
-		if card:
-			kwargs['card'] = card
-			if hasattr(card, 'url') and '//t.co/' in card.url:
-				# Try to convert the URL to the non-shortened/t.co one
-				# Retweets inherit the card but not the outlinks; try to get them from the retweeted tweet instead in that case.
-				candidates = []
-				if 'links' in kwargs:
-					candidates.extend(kwargs['links'])
-				if retweetedTweet:
-					candidates.extend(retweetedTweet.links)
-				for u in candidates:
-					if u.tcourl == card.url:
-						card.url = u.url
-						break
-				else:
-					_logger.warning(f'Could not translate t.co card URL on tweet {tweetId}')
 		return Tweet(**kwargs)
 
 	def _make_medium(self, medium, tweetId):
@@ -1490,36 +1394,6 @@ class _TwitterAPIScraper(snscrape.base.Scraper):
 		kwargs['username'] = user['screen_name']
 		kwargs['id'] = id_ if id_ else user['id'] if 'id' in user else int(user['id_str'])
 		kwargs['displayname'] = user['name']
-		kwargs['rawDescription'] = user['description']
-		kwargs['renderedDescription'] = self._render_text_with_urls(user['description'], user['entities']['description'].get('urls'))
-		if user['entities']['description'].get('urls'):
-			kwargs['descriptionLinks'] = [TextLink(
-			                                text = x.get('display_url'),
-			                                url = x['expanded_url'],
-			                                tcourl = x['url'],
-			                                indices = tuple(x['indices']),
-			                              ) for x in user['entities']['description']['urls']]
-		kwargs['verified'] = user.get('verified')
-		kwargs['created'] = email.utils.parsedate_to_datetime(user['created_at'])
-		kwargs['followersCount'] = user['followers_count']
-		kwargs['friendsCount'] = user['friends_count']
-		kwargs['statusesCount'] = user['statuses_count']
-		kwargs['favouritesCount'] = user['favourites_count']
-		kwargs['listedCount'] = user['listed_count']
-		kwargs['mediaCount'] = user['media_count']
-		kwargs['location'] = user['location']
-		kwargs['protected'] = user.get('protected')
-		if user.get('url'):
-			entity = user['entities'].get('url', {}).get('urls', [None])[0]
-			if not entity or entity['url'] != user['url']:
-				_logger.warning(f'Link inconsistency on user {kwargs["id"]}')
-			if not entity:
-				entity = {'indices': (0, len(user['url']))}
-			kwargs['link'] = TextLink(text = entity.get('display_url'), url = entity.get('expanded_url', user['url']), tcourl = user['url'], indices = tuple(entity['indices']))
-		kwargs['profileImageUrl'] = user['profile_image_url_https']
-		kwargs['profileBannerUrl'] = user.get('profile_banner_url')
-		if 'ext' in user and 'highlightedLabel' in user['ext'] and (label := user['ext']['highlightedLabel']['r']['ok'].get('label')):
-			kwargs['label'] = self._user_label_to_user_label(label)
 		return User(**kwargs)
 
 	def _user_label_to_user_label(self, label):
@@ -1598,32 +1472,32 @@ class TwitterSearchScraper(_TwitterAPIScraper):
 			raise ValueError('empty query')
 		paginationParams = {
 			'include_profile_interstitial_type': '1',
-			'include_blocking': '1',
-			'include_blocked_by': '1',
-			'include_followed_by': '1',
+			# 'include_blocking': '1',
+			# 'include_blocked_by': '1',
+			# 'include_followed_by': '1',
 			'include_want_retweets': '1',
-			'include_mute_edge': '1',
-			'include_can_dm': '1',
-			'include_can_media_tag': '1',
-			'include_ext_has_nft_avatar': '1',
-			'include_ext_is_blue_verified': '1',
-			'include_ext_verified_type': '1',
+			# 'include_mute_edge': '1',
+			# 'include_can_dm': '1',
+			# 'include_can_media_tag': '1',
+			# 'include_ext_has_nft_avatar': '1',
+			# 'include_ext_is_blue_verified': '1',
+			# 'include_ext_verified_type': '1',
 			'skip_status': '1',
 			'cards_platform': 'Web-12',
 			'include_cards': '1',
-			'include_ext_alt_text': 'true',
-			'include_ext_limited_action_results': 'false',
+			# 'include_ext_alt_text': 'true',
+			# 'include_ext_limited_action_results': 'false',
 			'include_quote_count': 'true',
 			'include_reply_count': '1',
 			'tweet_mode': 'extended',
-			'include_ext_collab_control': 'true',
-			'include_ext_views': 'true',
-			'include_entities': 'true',
+			# 'include_ext_collab_control': 'true',
+			# 'include_ext_views': 'true',
+			# 'include_entities': 'true',
 			'include_user_entities': 'true',
-			'include_ext_media_color': 'true',
-			'include_ext_media_availability': 'true',
-			'include_ext_sensitive_media_warning': 'true',
-			'include_ext_trusted_friends_metadata': 'true',
+			# 'include_ext_media_color': 'true',
+			# 'include_ext_media_availability': 'true',
+			#'include_ext_sensitive_media_warning': 'true',
+			# 'include_ext_trusted_friends_metadata': 'true',
 			'send_error_codes': 'true',
 			'simple_quoted_tweet': 'true',
 			'q': self._query,
@@ -1649,7 +1523,7 @@ class TwitterSearchScraper(_TwitterAPIScraper):
 			'pc': '1',
 			'spelling_corrections': '1',
 			'include_ext_edit_control': 'true',
-			'ext': 'mediaStats,highlightedLabel,hasNftAvatar,voiceInfo,enrichments,superFollowMetadata,unmentionInfo,editControl,collab_control,vibe',
+			# 'ext': 'mediaStats,highlightedLabel,hasNftAvatar,voiceInfo,enrichments,superFollowMetadata,unmentionInfo,editControl,collab_control,vibe',
 		}
 		params = paginationParams.copy()
 		del params['cursor']
@@ -1699,45 +1573,18 @@ class TwitterUserScraper(TwitterSearchScraper):
 			_logger.warning('User unavailable')
 			return None
 		user = obj['data']['user']['result']
-		rawDescription = user['legacy']['description']
-		renderedDescription = self._render_text_with_urls(rawDescription, user['legacy']['entities']['description']['urls'])
-		link = None
 		if user['legacy'].get('url'):
 			entity = user['legacy']['entities'].get('url', {}).get('urls', [None])[0]
 			if not entity or entity['url'] != user['legacy']['url']:
 				_logger.warning(f'Link inconsistency on user')
 			if not entity:
 				entity = {'indices': (0, len(user['legacy']['url']))}
-			link = TextLink(text = entity.get('display_url'), url = entity.get('expanded_url', user['legacy']['url']), tcourl = user['legacy']['url'], indices = tuple(entity['indices']))
-		label = None
 		if (labelO := user['affiliates_highlighted_label'].get('label')):
 			label = self._user_label_to_user_label(labelO)
 		return User(
 			username = user['legacy']['screen_name'],
 			id = int(user['rest_id']),
 			displayname = user['legacy']['name'],
-			rawDescription = rawDescription,
-			renderedDescription = renderedDescription,
-			descriptionLinks = [TextLink(
-			                      text = x.get('display_url'),
-			                      url = x['expanded_url'],
-			                      tcourl = x['url'],
-			                      indices = tuple(x['indices']),
-			                    ) for x in user['legacy']['entities']['description']['urls']],
-			verified = user['legacy']['verified'],
-			created = email.utils.parsedate_to_datetime(user['legacy']['created_at']),
-			followersCount = user['legacy']['followers_count'],
-			friendsCount = user['legacy']['friends_count'],
-			statusesCount = user['legacy']['statuses_count'],
-			favouritesCount = user['legacy']['favourites_count'],
-			listedCount = user['legacy']['listed_count'],
-			mediaCount = user['legacy']['media_count'],
-			location = user['legacy']['location'],
-			protected = user['legacy']['protected'],
-			link = link,
-			profileImageUrl = user['legacy']['profile_image_url_https'],
-			profileBannerUrl = user['legacy'].get('profile_banner_url'),
-			label = label,
 		  )
 
 	def get_items(self):

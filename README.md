@@ -38,7 +38,6 @@ Some noteworthy global options are:
 
 * `--jsonl` to get output as JSONL. This includes all information extracted by snscrape (e.g. message content, datetime, images; details vary by scraper).
 * `--max-results NUMBER` to only return the first `NUMBER` results.
-* `--with-entity` to get an item on the entity being scraped, e.g. the user or channel. This is not supported on all scrapers. (You can use this together with `--max-results 0` to only fetch the entity info.)
 
 #### Examples
 Collect all tweets by Jason Scott (@textfiles):
@@ -67,3 +66,13 @@ This program is free software: you can redistribute it and/or modify it under th
 This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
+## Commands
+```bash
+snscrape --verbose --jsonl twitter-search "(from:TaylorLorenz) include:nativeretweets since:2023-02-01"
+snscrape --verbose --jsonl twitter-search "(from:alikarimi_ak8) include:nativeretweets since:2023-02-01"
+snscrape --verbose --jsonl twitter-search "(from:cathiedwood) include:nativeretweets since:2023-02-01"
+
+snscrape --jsonl twitter-search "(to:TaylorLorenz) since:2023-02-01"
+```

@@ -57,7 +57,6 @@ def _json_serialise_datetime(obj):
 def _json_dataclass_to_dict(obj):
 	if isinstance(obj, _JSONDataclass) or dataclasses.is_dataclass(obj):
 		out = {}
-		out['_type'] = f'{type(obj).__module__}.{type(obj).__name__}'
 		for field in dataclasses.fields(obj):
 			assert field.name != '_type'
 			if field.name.startswith('_'):
@@ -96,7 +95,10 @@ class _JSONDataclass:
 				out[key] = int(value)
 				assert f'{key}.granularity' not in out, f'Granularity collision on {key}.granularity'
 				out[f'{key}.granularity'] = value.granularity
-		return json.dumps(out, default = _json_serialise_datetime)
+		return out
+		# print(out)
+		# print('**** >>>>>>>>>>>>>>>>>>>>>>')
+		# return json.dumps(out, default = _json_serialise_datetime)
 
 
 @dataclasses.dataclass

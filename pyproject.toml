@@ -26,6 +26,7 @@ dependencies = [
 	'beautifulsoup4',
 	'pytz; python_version < "3.9.0"',
 	'filelock',
+	'pymongo',
 ]
 requires-python = '~=3.8'
 dynamic = ['version']
