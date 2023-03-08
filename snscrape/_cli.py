@@ -303,8 +303,10 @@ def main():
 	configure_logging(args.verbosity, args.dumpLocals)
 	scraper = args.cls._cli_from_args(args)
 	i = 0
-	client = MongoClient("mongodb://localhost:27017/")
-	db = client["twitter-watch"]
+	mongoUri = os.environ.get('MONGODB_URI', 'mongo://localhost:27017/')
+	mongoDb = os.environ.get('MONGODB_DB', 'twitter-watch')
+	client = MongoClient(mongoUri)
+	db = client[mongoDb]
 	tweets = db["tweets"]
 	tweets.create_index([("id", 1)], unique=True)
 	tweets.create_index([("conversationId", 1)], unique=False)
