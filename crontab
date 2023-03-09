@@ -1,0 +1,1 @@
+*/30 * * * * /bin/bash /snscrape/start.sh $(date +%Y-%m-%d) alikarimi_ak8 TaylorLorenz cathiedwood >> /log 2>&1
